@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Study Buddy</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Study Buddy</h1>
+    <p>Flashcards • Quiz • AI Assistant</p>
+  </header>
+
+  <div class="container">
+    <h2>Your Notes</h2>
+    <textarea id="notes" rows="8" placeholder="Paste your notes here..."></textarea>
+
+    <div class="row">
+      <button id="btnGen">Generate Flashcards</button>
+      <button id="btnQuiz">Start Quiz</button>
+      <button id="btnExport">Export Deck</button>
+
+      <!-- extra controls -->
+      <button id="btnImport">Import Deck</button>
+      <button id="btnDark">🌙 Dark mode</button>
+      <span id="status" class="muted"></span>
+    </div>
+
+    <!-- quiz progress -->
+    <div id="quizProgress" class="progress">
+      <div class="bar" style="width:0%"></div>
+    </div>
+
+    <h2>Flashcards</h2>
+    <div id="cards"></div>
+
+    <h2>Quiz</h2>
+    <div id="quiz"></div>
+
+    <h2>AI Study Assistant 🤖</h2>
+    <div id="assistant" class="assistant">
+      <div class="row">
+        <input type="text" id="assistantInput" class="ask" placeholder="Ask about your notes or general topics..." />
+        <button id="assistantSend">Ask</button>
+      </div>
+      <div id="assistantOutput" class="chat"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
