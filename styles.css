@@ -116,3 +116,40 @@ input.ask::placeholder { color: var(--placeholder); }
 }
 
 .dark header { color: #fff; }
+
+/* ===== StudyPal Pro Add-ons ===== */
+.pro-block { margin-top: 22px; }
+.pro-controls { gap: 12px; }
+.quiz-opts {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  align-items: center; background: var(--card); border: 1px solid var(--border);
+  padding: 10px 12px; border-radius: 12px;
+}
+.quiz-opts label { font-size: 14px; color: var(--text); display: flex; gap: 6px; align-items: center; }
+.quiz-opts input[type="number"], .quiz-opts select {
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--input-bg); color: var(--input-text);
+}
+.quiz-opts .check { gap: 6px; }
+
+button.ghost {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.small { font-size: 12px; }
+code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 4px; }
+.dark code { background: rgba(255,255,255,0.08); }
+
+/* Pro quiz UI */
+.pro-question { font-weight: 600; margin-bottom: 8px; }
+.pro-opt { margin: 6px 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.pro-opt:hover { filter: brightness(0.98); }
+.pro-opt.correct { outline: 2px solid #36c275; }
+.pro-opt.wrong { outline: 2px solid #e25b5b; }
+.pro-actions { display: flex; gap: 10px; margin-top: 10px; }
+
+.kbd { border: 1px solid var(--border); padding: 0 6px; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.sr-summary { margin-top: 8px; }
+.sr-badge { display:inline-block; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; margin-right: 6px; font-size: 12px; }
+
