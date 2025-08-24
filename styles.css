@@ -153,3 +153,56 @@ code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 4px; }
 .sr-summary { margin-top: 8px; }
 .sr-badge { display:inline-block; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; margin-right: 6px; font-size: 12px; }
 
+/* ===== Customization Panel (ADD THIS) ===== */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0 24px;
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.settings-grid label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* Hide/show tags via body class */
+.hide-tags #cards .tag,
+.hide-tags #quiz .tag { display: none; }
+
+/* Card density options via body class */
+.compact-cards #cards .card,
+.compact-cards #quiz .card {
+  padding: 8px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.compact-cards .actions { gap: 6px; }
+
+/* Typed answer quiz styling */
+.quiz-typed-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-text);
+  margin-top: 8px;
+}
+.quiz-feedback {
+  margin-top: 8px;
+  font-size: 14px;
+}
+.quiz-feedback.ok { color: #2ecc71; }
+.quiz-feedback.no { color: #e74c3c; }
+
+/* Accent color is customizable — we’ll update --accent at runtime */
+
