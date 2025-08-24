@@ -205,4 +205,29 @@ code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 4px; }
 .quiz-feedback.no { color: #e74c3c; }
 
 /* Accent color is customizable — we’ll update --accent at runtime */
+/* ===== MVP add-ons (PASTE AT END) ===== */
+.small { font-size: 12px; }
+.tip {
+  margin: 10px 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.hidden { display: none; }
+
+/* Better keyboard focus visibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Optional: make icon buttons accessible if you use 🔊 etc. */
+button.speakQ { aria-label: "Speak question"; }
+button.speakA { aria-label: "Speak answer"; }
+
 
