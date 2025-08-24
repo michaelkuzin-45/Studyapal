@@ -425,3 +425,277 @@ function setup() {
 }
 
 document.addEventListener("DOMContentLoaded", setup);
+
+/* ===================== StudyPal Pro — Smart Cards + Pro Quiz + Spaced Repetition ===================== */
+
+/** Utils **/
+const SP_KEY = "studypal_spaced_rep_v1";
+
+function spHash(str) {
+  // simple stable hash for card identity (q+a)
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return (h >>> 0).toString(36);
+}
+function cardId(c) { return spHash((c.q || "") + "::" + (c.a || "")); }
+function shuffle(arr){ return arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); }
+function sample(arr, n){ return arr.slice(0, Math.max(0, Math.min(n, arr.length))); }
+
+/** Spaced Repetition store: id -> box(1..5), streak, lastTs **/
+let SR = {};
+function loadSR(){ try { SR = JSON.parse(localStorage.getItem(SP_KEY) || "{}"); } catch { SR = {}; } }
+function saveSR(){ try { localStorage.setItem(SP_KEY, JSON.stringify(SR)); } catch {} }
+function getBox(id){ return (SR[id]?.box) || 1; }
+function bump(id, correct){
+  const now = Date.now();
+  const cur = SR[id] || { box: 1, streak: 0, lastTs: 0 };
+  if (correct) {
+    cur.streak = (cur.streak || 0) + 1;
+    cur.box = Math.min(5, cur.box + 1);
+  } else {
+    cur.streak = 0;
+    cur.box = 1;
+  }
+  cur.lastTs = now;
+  SR[id] = cur; saveSR();
+}
+function srSummaryText(cards){
+  const counts = [0,0,0,0,0,0]; // index 1..5
+  cards.forEach(c => counts[getBox(cardId(c))]++);
+  return counts.slice(1).map((n,i)=>`<span class="sr-badge">Box ${i+1}: ${n}</span>`).join(" ");
+}
+
+/** Smart generator: better Q/A from notes **/
+function smartNotesToCards(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  const pairs = [];
+  // 1) Q: / A: blocks
+  for (let i = 0; i < lines.length; i++) {
+    const L = lines[i];
+    if (/^q[:\-]/i.test(L)) {
+      const q = L.replace(/^q[:\-]\s*/i, "");
+      const aLine = (lines[i+1] || "");
+      if (/^a[:\-]/i.test(aLine)) {
+        const a = aLine.replace(/^a[:\-]\s*/i, "");
+        pairs.push({ q, a, tags: ["smart","Q/A"] });
+        i++;
+        continue;
+      }
+    }
+  }
+
+  // 2) term — definition   OR   term: definition   OR   term - definition
+  lines.forEach(L => {
+    const m = L.match(/^(.{2,80}?)[\s]*[:\-—–]+[\s]+(.{3,})$/); // term : def
+    if (m && !/^q[:\-]/i.test(L) && !/^a[:\-]/i.test(L)) {
+      const term = m[1].trim();
+      const def = m[2].trim();
+      if (term && def) pairs.push({ q: `What is ${term}?`, a: def, tags: ["smart","term"] });
+    }
+  });
+
+  // 3) Headings create context → next sentence as answer
+  const headingIdx = lines
+    .map((L,i)=> [/^#{1,6}\s+(.+)/.exec(L) || /^\*\*?(.+?)\*\*?$/.exec(L) ? i : -1])
+    .filter(i=>i>=0);
+  headingIdx.forEach(i => {
+    const head = lines[i].replace(/^#{1,6}\s+/, "").replace(/^\*+|\*+$/g,"").trim();
+    const next = lines[i+1] || "";
+    if (head && next) pairs.push({ q: `Explain: ${head}`, a: next.slice(0, 240), tags: ["smart","heading"] });
+  });
+
+  // 4) Fallback: sentences → cloze questions
+  const sentences = text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 16);
+  sentences.slice(0, 30).forEach((s, i) => {
+    const firstWord = (s.split(" ")[0] || "").replace(/[^A-Za-z0-9\-()]/g,"");
+    if (firstWord) {
+      pairs.push({ q: `Card ${i+1}: ${firstWord} …?`, a: s.slice(0, 220), tags: ["smart","auto"] });
+    }
+  });
+
+  // Deduplicate by (q+a) hash, keep first
+  const seen = new Set();
+  const out = [];
+  for (const p of pairs) {
+    const id = cardId(p);
+    if (!seen.has(id)) { out.push(p); seen.add(id); }
+  }
+  // Reasonable cap
+  return out.slice(0, 60);
+}
+
+/** Pro Quiz **/
+function buildChoices(correct, pool, k=3){
+  const others = shuffle(pool.filter(a => a !== correct)).slice(0, k-1);
+  return shuffle([correct, ...others]);
+}
+
+function startProQuiz() {
+  const mode = (document.getElementById("modeSelect")?.value || "mc");
+  const nReq = Math.max(1, Math.min(25, parseInt(document.getElementById("numQuestions")?.value || "5", 10)));
+  const doShuffle = !!document.getElementById("shuffleToggle")?.checked;
+
+  if (!DB.cards.length) {
+    const qz = document.getElementById("quiz");
+    if (qz) qz.innerHTML = "<p class='muted'>Generate cards first.</p>";
+    return;
+  }
+
+  // Queue: prefer lower Leitner boxes
+  const byBox = [1,2,3,4,5].flatMap(b => DB.cards.filter(c => getBox(cardId(c)) === b));
+  let queue = byBox.length ? byBox : DB.cards.slice();
+  if (doShuffle) queue = shuffle(queue);
+  queue = sample(queue, nReq);
+
+  // Render loop
+  const qz = document.getElementById("quiz");
+  const poolAnswers = DB.cards.map(c => c.a);
+  let i = 0, correctCount = 0;
+
+  function renderMC(card){
+    const opts = buildChoices(card.a, poolAnswers, 4);
+    qz.innerHTML = `
+      <div class="card">
+        <div class="pro-question">${esc(card.q)}</div>
+        ${opts.map(o => `<div class="pro-opt" data-v="${esc(o)}">${esc(o)}</div>`).join("")}
+        <div class="pro-actions">
+          <button id="btnSkip" class="ghost">Skip</button>
+        </div>
+      </div>
+    `;
+    qz.querySelectorAll(".pro-opt").forEach(el => {
+      el.onclick = () => {
+        const pick = el.getAttribute("data-v");
+        const id = cardId(card);
+        if (pick === card.a) {
+          el.classList.add("correct");
+          bump(id, true); correctCount++;
+        } else {
+          el.classList.add("wrong");
+          // highlight correct
+          qz.querySelectorAll(".pro-opt").forEach(x => {
+            if (x.getAttribute("data-v") === card.a) x.classList.add("correct");
+          });
+          bump(id, false);
+        }
+        setTimeout(nextCard, 450);
+      };
+    });
+    document.getElementById("btnSkip").onclick = () => { bump(cardId(card), false); nextCard(); };
+  }
+
+  function renderType(card){
+    qz.innerHTML = `
+      <div class="card">
+        <div class="pro-question">${esc(card.q)}</div>
+        <input id="typeAns" class="ask" placeholder="Type your answer…" />
+        <div class="pro-actions">
+          <button id="btnCheck">Check</button>
+          <button id="btnReveal" class="ghost">Reveal</button>
+          <button id="btnSkip" class="ghost">Skip</button>
+        </div>
+      </div>
+    `;
+    const input = document.getElementById("typeAns");
+    const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const id = cardId(card);
+    const check = () => {
+      const ok = norm(input.value) && norm(input.value) === norm(card.a);
+      if (ok) { bump(id, true); correctCount++; }
+      else { bump(id, false); }
+      qz.querySelector(".pro-actions").insertAdjacentHTML("beforeend",
+        `<span class="muted">Answer: <span class="kbd">${esc(card.a)}</span></span>`);
+      setTimeout(nextCard, 500);
+    };
+    document.getElementById("btnCheck").onclick = check;
+    document.getElementById("btnReveal").onclick = () => {
+      qz.querySelector(".pro-actions").insertAdjacentHTML("beforeend",
+        `<span class="muted">Answer: <span class="kbd">${esc(card.a)}</span></span>`);
+      bump(id, false);
+      setTimeout(nextCard, 500);
+    };
+    document.getElementById("btnSkip").onclick = () => { bump(id, false); nextCard(); };
+    input.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+    input.focus();
+  }
+
+  function nextCard(){
+    i++;
+    if (i >= queue.length) {
+      qz.innerHTML = `<p><b>Pro Quiz done!</b> Score ${correctCount}/${queue.length}</p>`;
+      // update top progress bar if present
+      const bar = document.querySelector("#quizProgress .bar");
+      if (bar) bar.style.width = "100%";
+      // refresh SR summary
+      const el = document.getElementById("srSummary");
+      if (el) el.innerHTML = srSummaryText(DB.cards);
+      return;
+    }
+    const c = queue[i];
+    if (mode === "mc") renderMC(c); else renderType(c);
+    // update progress bar
+    const bar = document.querySelector("#quizProgress .bar");
+    if (bar) bar.style.width = Math.round(((i)/queue.length) * 100) + "%";
+  }
+
+  // start
+  if (!qz) return;
+  const first = queue[0];
+  if (mode === "mc") renderMC(first); else renderType(first);
+  const el = document.getElementById("srSummary");
+  if (el) el.innerHTML = srSummaryText(DB.cards);
+}
+
+/** Wire up new controls (second DOMContentLoaded is fine) **/
+document.addEventListener("DOMContentLoaded", () => {
+  loadSR();
+
+  // Smart Generate
+  const btnSmart = document.getElementById("btnSmartGen");
+  if (btnSmart) btnSmart.onclick = () => {
+    const notesVal = (document.getElementById("notes")?.value || "").trim();
+    if (!notesVal) { alert("Paste notes first."); return; }
+    const cards = smartNotesToCards(notesVal);
+    if (!cards.length) { alert("Couldn't detect Q/A pairs. Try adding lines like 'Term — definition'."); return; }
+    // Merge with existing without duplicates
+    const existingIds = new Set(DB.cards.map(cardId));
+    const merged = DB.cards.concat(cards.filter(c => !existingIds.has(cardId(c))));
+    DB.cards = merged;
+    // Save & render
+    if (!DB.title) DB.title = "StudyPal Deck";
+    (function render(){ if (typeof renderCards === "function") renderCards(); })();
+    (function saveNow(){ if (typeof save === "function") save(); })();
+
+    const st = document.getElementById("status");
+    if (st) st.textContent = `Smart-generated ${cards.length} new cards (merged to ${DB.cards.length}).`;
+    const el = document.getElementById("srSummary");
+    if (el) el.innerHTML = srSummaryText(DB.cards);
+  };
+
+  // Pro Quiz start
+  const btnStartPro = document.getElementById("btnStartPro");
+  if (btnStartPro) btnStartPro.onclick = startProQuiz;
+
+  // Reset spaced-rep progress
+  const btnReset = document.getElementById("btnResetProgress");
+  if (btnReset) btnReset.onclick = () => {
+    if (confirm("Reset spaced-repetition progress?")) {
+      SR = {}; saveSR();
+      const el = document.getElementById("srSummary");
+      if (el) el.innerHTML = srSummaryText(DB.cards);
+      alert("Progress reset.");
+    }
+  };
+
+  // Show initial SR summary
+  const el = document.getElementById("srSummary");
+  if (el) el.innerHTML = srSummaryText(DB.cards);
+});
