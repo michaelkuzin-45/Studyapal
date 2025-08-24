@@ -932,3 +932,54 @@ function setupPlus() {
 // Run setupPlus whether DOM is already ready or not
 if (document.readyState !== "loading") setupPlus();
 else document.addEventListener("DOMContentLoaded", setupPlus);
+
+/* ===== MVP add-ons (PASTE AT END) ===== */
+
+// Flip the dark-mode button label (🌙 <-> ☀️)
+function updateDarkLabel() {
+  const btnDark = document.getElementById("btnDark");
+  if (!btnDark) return;
+  const isDark = document.documentElement.classList.contains("dark");
+  btnDark.textContent = isDark ? "☀️ Light mode" : "🌙 Dark mode";
+}
+
+// Wrap existing toggleDark() so the label updates too
+(function wrapToggleDark() {
+  const original = window.toggleDark || function () {
+    document.documentElement.classList.toggle("dark");
+  };
+  window.toggleDark = function () {
+    original();
+    try {
+      localStorage.setItem(
+        "sb-dark",
+        document.documentElement.classList.contains("dark") ? "1" : "0"
+      );
+    } catch {}
+    updateDarkLabel();
+  };
+})();
+
+// Show the backup tip after "Generate Flashcards"
+function setupBackupTip() {
+  const btnGen = document.getElementById("btnGen");
+  const tip = document.getElementById("genTip");
+  if (btnGen && tip) {
+    btnGen.addEventListener("click", () => tip.classList.remove("hidden"));
+  }
+}
+
+// Init once DOM is ready
+(function initMvpAddons() {
+  if (document.readyState !== "loading") {
+    updateDarkLabel();
+    setupBackupTip();
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      updateDarkLabel();
+      setupBackupTip();
+    });
+  }
+})();
+
+
