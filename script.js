@@ -699,3 +699,236 @@ document.addEventListener("DOMContentLoaded", () => {
   const el = document.getElementById("srSummary");
   if (el) el.innerHTML = srSummaryText(DB.cards);
 });
+
+/* ===== StudyPal Upgrades: Settings, Better Quiz & Customization (ADD THIS) ===== */
+
+// --- Persistent settings & stats ---
+const SB = {
+  settingsKey: "sb-settings-v1",
+  statsKey: "sb-stats-v1",
+  settings: {
+    quizLen: 5,            // 5 | 10 | 20 | 'all'
+    mode: "mc",            // 'mc' | 'typed'
+    shuffle: true,
+    showTags: false,
+    cardSize: "comfy",     // 'comfy' | 'compact'
+    accent: "#4facfe"
+  },
+  stats: { totalAnswered: 0, totalCorrect: 0, streak: 0 }
+};
+
+(function loadSettingsAndStats(){
+  try {
+    const s = JSON.parse(localStorage.getItem(SB.settingsKey) || "null");
+    if (s) SB.settings = { ...SB.settings, ...s };
+  } catch {}
+  try {
+    const t = JSON.parse(localStorage.getItem(SB.statsKey) || "null");
+    if (t) SB.stats = { ...SB.stats, ...t };
+  } catch {}
+})();
+
+function saveSettings() {
+  try { localStorage.setItem(SB.settingsKey, JSON.stringify(SB.settings)); } catch {}
+  const el = document.getElementById("settingsStatus");
+  if (el) { el.textContent = "Settings saved"; setTimeout(()=> el.textContent="", 900); }
+}
+function saveStats() {
+  try { localStorage.setItem(SB.statsKey, JSON.stringify(SB.stats)); } catch {}
+}
+
+// --- Apply settings to UI/theme ---
+function applySettingsToTheme() {
+  // Accent color
+  document.documentElement.style.setProperty("--accent", SB.settings.accent);
+  // Create a lighter secondary automatically
+  try {
+    const c = SB.settings.accent.replace("#", "");
+    const r = parseInt(c.substring(0,2),16), g=parseInt(c.substring(2,4),16), b=parseInt(c.substring(4,6),16);
+    const lighten = (x)=> Math.min(255, Math.round(x + (255-x)*0.4));
+    const c2 = `#${lighten(r).toString(16).padStart(2,"0")}${lighten(g).toString(16).padStart(2,"0")}${lighten(b).toString(16).padStart(2,"0")}`;
+    document.documentElement.style.setProperty("--accent-2", c2);
+  } catch {}
+
+  // Tags visibility
+  document.body.classList.toggle("hide-tags", !SB.settings.showTags);
+
+  // Card density
+  document.body.classList.toggle("compact-cards", SB.settings.cardSize === "compact");
+}
+
+// --- Enhanced quiz helpers ---
+function chooseQuizSet() {
+  const len = SB.settings.quizLen === "all" ? DB.cards.length : Math.min(parseInt(SB.settings.quizLen || 5,10), DB.cards.length);
+  let arr = DB.cards.map((c, i) => ({...c, _i:i}));
+  if (SB.settings.shuffle) arr.sort(()=>Math.random()-0.5);
+  return arr.slice(0, Math.max(1, len));
+}
+
+function buildChoicesFor(card, pool, n=3) {
+  // Take n-1 wrong answers from pool (prefer distinct answers)
+  const wrong = pool.filter(a => a !== card.a);
+  const picks = [];
+  while (picks.length < n-1 && wrong.length) {
+    const idx = Math.floor(Math.random()*wrong.length);
+    const w = wrong.splice(idx,1)[0];
+    if (!picks.includes(w)) picks.push(w);
+  }
+  const choices = [card.a, ...picks].sort(()=>Math.random()-0.5);
+  return choices;
+}
+
+function normalize(s) {
+  return String(s||"").trim().replace(/\s+/g," ").replace(/[^\w\s]/g,"").toLowerCase();
+}
+
+// --- Upgraded quiz (supports MC or typed) ---
+let quizSet = [];
+let quizPointer = 0;
+
+function startQuizPlus() {
+  const qz = document.getElementById("quiz");
+  if (!qz) return;
+  if (!DB.cards.length) { qz.innerHTML = "<p class='muted'>Generate cards first.</p>"; return; }
+
+  quizSet = chooseQuizSet();
+  quizPointer = 0; score = 0;
+
+  renderQuestionPlus();
+  updateProgressPlus();
+}
+
+function updateProgressPlus() {
+  const bar = document.querySelector("#quizProgress .bar");
+  if (!bar) return;
+  const total = quizSet.length || 1;
+  const pct = Math.min(100, Math.round((quizPointer / total) * 100));
+  bar.style.width = pct + "%";
+}
+
+function renderQuestionPlus() {
+  const qz = document.getElementById("quiz");
+  const total = quizSet.length;
+
+  if (quizPointer >= total) {
+    qz.innerHTML = `<p><b>Done!</b> Score ${score}/${total} — Accuracy ${(score*100/total).toFixed(0)}%</p>`;
+    if (score === total) celebrate();
+    updateProgressPlus();
+    return;
+  }
+
+  const c = quizSet[quizPointer];
+  const poolAnswers = quizSet.map(x => x.a);
+  const isTyped = SB.settings.mode === "typed";
+
+  const body = [];
+  body.push(`<div class="card">`);
+  body.push(`<b>${esc(c.q)}</b>`);
+
+  if (isTyped) {
+    body.push(`<input id="typedAns" class="quiz-typed-input" type="text" placeholder="Type your answer..." />`);
+  } else {
+    const choices = buildChoicesFor(c, poolAnswers, 3);
+    body.push(choices.map(ch => `
+      <div><label><input type="radio" name="opt" value="${esc(ch)}"> ${esc(ch)}</label></div>
+    `).join(""));
+  }
+
+  body.push(`<div class="actions">
+    <button id="submitPlus">Submit</button>
+    <button id="revealPlus">Reveal</button>
+  </div>
+  <div id="feedback" class="quiz-feedback"></div>
+  </div>`);
+
+  qz.innerHTML = body.join("");
+
+  document.getElementById("revealPlus").onclick = () => {
+    const fb = document.getElementById("feedback");
+    fb.textContent = `Answer: ${c.a}`;
+    fb.className = "quiz-feedback";
+  };
+
+  document.getElementById("submitPlus").onclick = () => {
+    let correct = false;
+    if (isTyped) {
+      const v = document.getElementById("typedAns").value;
+      correct = normalize(v) === normalize(c.a);
+    } else {
+      const pick = document.querySelector('input[name="opt"]:checked');
+      if (!pick) { alert("Pick one!"); return; }
+      correct = (pick.value === c.a);
+    }
+
+    const fb = document.getElementById("feedback");
+    if (correct) {
+      score++; SB.stats.totalCorrect++; SB.stats.streak++;
+      fb.textContent = "Correct! 🎉";
+      fb.className = "quiz-feedback ok";
+    } else {
+      SB.stats.streak = 0;
+      fb.textContent = `Not quite. Correct answer: ${c.a}`;
+      fb.className = "quiz-feedback no";
+    }
+    SB.stats.totalAnswered++;
+    saveStats();
+
+    // Small delay to move to next question so user can see feedback
+    setTimeout(() => {
+      quizPointer++;
+      updateProgressPlus();
+      renderQuestionPlus();
+    }, 550);
+  };
+}
+
+// --- Wire up the extra UI (runs after your original setup) ---
+function setupPlus() {
+  // Rebind Start Quiz to upgraded version
+  const btnQuiz = document.getElementById("btnQuiz");
+  if (btnQuiz) btnQuiz.onclick = startQuizPlus;
+
+  // Populate controls with current settings
+  const byId = (id) => document.getElementById(id);
+  const optLen = byId("optLen");
+  const optMode = byId("optMode");
+  const optShuffle = byId("optShuffle");
+  const optShowTags = byId("optShowTags");
+  const optCardSize = byId("optCardSize");
+  const optAccent = byId("optAccent");
+
+  if (optLen) optLen.value = String(SB.settings.quizLen);
+  if (optMode) optMode.value = SB.settings.mode;
+  if (optShuffle) optShuffle.checked = !!SB.settings.shuffle;
+  if (optShowTags) optShowTags.checked = !!SB.settings.showTags;
+  if (optCardSize) optCardSize.value = SB.settings.cardSize;
+  if (optAccent) optAccent.value = SB.settings.accent;
+
+  applySettingsToTheme();
+
+  // Save button
+  const btnSave = byId("btnSaveSettings");
+  if (btnSave) btnSave.onclick = () => {
+    SB.settings.quizLen = (optLen ? (optLen.value === "all" ? "all" : parseInt(optLen.value,10)||5) : 5);
+    SB.settings.mode = optMode ? optMode.value : "mc";
+    SB.settings.shuffle = optShuffle ? !!optShuffle.checked : true;
+    SB.settings.showTags = optShowTags ? !!optShowTags.checked : false;
+    SB.settings.cardSize = optCardSize ? optCardSize.value : "comfy";
+    SB.settings.accent = optAccent ? optAccent.value : "#4facfe";
+    saveSettings();
+    applySettingsToTheme();
+  };
+
+  // Reset stats
+  const btnReset = byId("btnResetStats");
+  if (btnReset) btnReset.onclick = () => {
+    SB.stats = { totalAnswered: 0, totalCorrect: 0, streak: 0 };
+    saveStats();
+    const el = document.getElementById("settingsStatus");
+    if (el) { el.textContent = "Stats reset"; setTimeout(()=> el.textContent="", 900); }
+  };
+}
+
+// Run setupPlus whether DOM is already ready or not
+if (document.readyState !== "loading") setupPlus();
+else document.addEventListener("DOMContentLoaded", setupPlus);
