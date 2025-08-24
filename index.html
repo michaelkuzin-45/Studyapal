@@ -47,7 +47,44 @@
       <div id="assistantOutput" class="chat"></div>
     </div>
   </div>
+  <!-- ===== StudyPal Pro Add-ons ===== -->
+  <section class="pro-block">
+    <h2>Pro Generator & Quiz</h2>
+
+    <div class="row pro-controls">
+      <button id="btnSmartGen">✨ Smart Generate</button>
+
+      <div id="quizOpts" class="quiz-opts">
+        <label>
+          Mode
+          <select id="modeSelect">
+            <option value="mc">Multiple Choice</option>
+            <option value="type">Type Answer</option>
+          </select>
+        </label>
+        <label>
+          # Questions
+          <input id="numQuestions" type="number" min="1" max="25" value="5" />
+        </label>
+        <label class="check">
+          <input id="shuffleToggle" type="checkbox" checked />
+          Shuffle
+        </label>
+        <button id="btnStartPro">Start Pro Quiz</button>
+        <button id="btnResetProgress" class="ghost">Reset Progress</button>
+      </div>
+    </div>
+
+    <p class="muted small">
+      Tip: Use lines like <code>ATP — cellular energy currency</code> or pairs <code>Q: … / A: …</code>.
+      The smart generator detects terms, headings, and definitions.
+    </p>
+
+    <div id="srSummary" class="sr-summary muted small"></div>
+  </section>
+  <!-- ===== End StudyPal Pro Add-ons ===== -->
 
   <script src="script.js"></script>
 </body>
 </html>
+
