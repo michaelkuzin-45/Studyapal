@@ -83,8 +83,62 @@
     <div id="srSummary" class="sr-summary muted small"></div>
   </section>
   <!-- ===== End StudyPal Pro Add-ons ===== -->
+<!-- ===== Customization & Quiz Options (ADD THIS) ===== -->
+<h2>Customize & Quiz Options</h2>
+<div id="customize" class="panel">
+  <div class="settings-grid">
+    <label>
+      Quiz length
+      <select id="optLen">
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="all">All cards</option>
+      </select>
+    </label>
 
+    <label>
+      Answer mode
+      <select id="optMode">
+        <option value="mc" selected>Multiple choice</option>
+        <option value="typed">Typed answer</option>
+      </select>
+    </label>
+
+    <label>
+      Shuffle cards
+      <input type="checkbox" id="optShuffle" checked />
+    </label>
+
+    <label>
+      Show tags on cards
+      <input type="checkbox" id="optShowTags" />
+    </label>
+
+    <label>
+      Card size
+      <select id="optCardSize">
+        <option value="comfy" selected>Comfy</option>
+        <option value="compact">Compact</option>
+      </select>
+    </label>
+
+    <label>
+      Accent color
+      <input type="color" id="optAccent" value="#4facfe" />
+    </label>
+  </div>
+
+  <div class="row">
+    <button id="btnSaveSettings">Save Settings</button>
+    <button id="btnResetStats">Reset Stats</button>
+    <span id="settingsStatus" class="muted"></span>
+  </div>
+</div>
+
+  
   <script src="script.js"></script>
 </body>
 </html>
+
 
